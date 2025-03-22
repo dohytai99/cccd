@@ -6,10 +6,11 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.yourcompany.yourapp # Thay đổi theo bundle ID của bạn
+        bundle_identifier: com.dohytai99.cccd
       vars:
         XCODE_WORKSPACE: "Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
+        BUNDLE_ID: "com.dohytai99.cccd"
       xcode: latest
       cocoapods: default
     scripts:
@@ -22,6 +23,12 @@ workflows:
       - name: Install pods
         script: |
           cd ios && pod install
+      - name: Update bundle ID
+        script: |
+          cd ios
+          PLIST_PATH="Runner/Info.plist"
+          PLIST_BUDDY="/usr/libexec/PlistBuddy"
+          $PLIST_BUDDY -c "Set :CFBundleIdentifier $BUNDLE_ID" "$PLIST_PATH"
       - name: Flutter build ipa
         script: |
           flutter build ipa --release \
@@ -33,4 +40,4 @@ workflows:
     publishing:
       email:
         recipients:
-          - your.email@example.com # Thay đổi email của bạn 
+          - dohytai99@gmail.com 
