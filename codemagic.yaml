@@ -15,22 +15,31 @@ workflows:
       - name: Update Flutter
         script: |
           flutter upgrade
+      - name: Create Flutter project
+        script: |
+          cd $CM_BUILD_DIR
+          rm -rf *
+          flutter create --org com.dohytai99 cccd
+          cd cccd
+          cp -f $CM_BUILD_DIR/pubspec.yaml ./pubspec.yaml
       - name: Get Flutter packages
         script: |
+          cd $CM_BUILD_DIR/cccd
           flutter clean
           flutter pub get
       - name: Install pods
         script: |
-          cd ios && pod install
+          cd $CM_BUILD_DIR/cccd/ios && pod install
       - name: Update bundle ID and build settings
         script: |
-          cd ios
+          cd $CM_BUILD_DIR/cccd/ios
           # Cập nhật Bundle ID trong Info.plist
           PLIST_PATH="Runner/Info.plist"
           PLIST_BUDDY="/usr/libexec/PlistBuddy"
           $PLIST_BUDDY -c "Set :CFBundleIdentifier $BUNDLE_ID" "$PLIST_PATH"
           
           # Tắt code signing
+          mkdir -p build/Release-iphoneos/Runner.app
           /usr/libexec/PlistBuddy -c "Add :CODE_SIGNING_ALLOWED NO" build/Release-iphoneos/Runner.app/Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :CODE_SIGNING_REQUIRED NO" build/Release-iphoneos/Runner.app/Info.plist || true
           
@@ -48,7 +57,7 @@ workflows:
           </plist>' > "$ENTITLEMENTS_PATH"
       - name: Build unsigned IPA
         script: |
-          cd ios
+          cd $CM_BUILD_DIR/cccd/ios
           xcodebuild -workspace Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
@@ -61,10 +70,11 @@ workflows:
           
           # Create IPA
           cd build/Release-iphoneos
-          mkdir Payload
+          mkdir -p Payload
           cp -r Runner.app Payload/
           zip -r app.ipa Payload
-          mv app.ipa ../../../build/ios/ipa/
+          mkdir -p $CM_BUILD_DIR/build/ios/ipa
+          mv app.ipa $CM_BUILD_DIR/build/ios/ipa/
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
