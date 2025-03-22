@@ -10,10 +10,15 @@ workflows:
         BUNDLE_ID: "com.dohytai99.cccd"
       xcode: latest
       cocoapods: default
+      flutter: stable
     scripts:
+      - name: Update Flutter
+        script: |
+          flutter upgrade
       - name: Get Flutter packages
         script: |
-          flutter packages pub get
+          flutter clean
+          flutter pub get
       - name: Install pods
         script: |
           cd ios && pod install
