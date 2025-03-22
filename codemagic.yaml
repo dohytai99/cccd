@@ -54,7 +54,7 @@ workflows:
           cd $CM_BUILD_DIR/cccd/ios
           # Tạo Podfile mới với cấu hình phiên bản iOS
           cat > Podfile << 'EOL'
-          platform :ios, '12.0'
+          platform :ios, '13.0'
 
           # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
           ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -94,11 +94,16 @@ workflows:
               flutter_additional_ios_build_settings(target)
               target.build_configurations.each do |config|
                 config.build_settings['ENABLE_BITCODE'] = 'NO'
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
               end
             end
           end
           EOL
+      - name: Update project settings
+        script: |
+          cd $CM_BUILD_DIR/cccd/ios
+          # Cập nhật minimum deployment target trong project.pbxproj
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 11.0;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g' Runner.xcodeproj/project.pbxproj
       - name: Install pods
         script: |
           cd $CM_BUILD_DIR/cccd/ios && pod install
