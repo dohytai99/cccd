@@ -4,9 +4,6 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
-      ios_signing:
-        distribution_type: development
-        bundle_identifier: com.dohytai99.cccd
       vars:
         XCODE_WORKSPACE: "Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
@@ -14,33 +11,58 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Set up code signing settings
-        script: |
-          xcode-project use-profiles
       - name: Get Flutter packages
         script: |
           flutter packages pub get
       - name: Install pods
         script: |
           cd ios && pod install
-      - name: Update bundle ID and entitlements
+      - name: Update bundle ID and build settings
         script: |
           cd ios
+          # Cập nhật Bundle ID trong Info.plist
           PLIST_PATH="Runner/Info.plist"
           PLIST_BUDDY="/usr/libexec/PlistBuddy"
           $PLIST_BUDDY -c "Set :CFBundleIdentifier $BUNDLE_ID" "$PLIST_PATH"
           
+          # Tắt code signing
+          /usr/libexec/PlistBuddy -c "Add :CODE_SIGNING_ALLOWED NO" build/Release-iphoneos/Runner.app/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :CODE_SIGNING_REQUIRED NO" build/Release-iphoneos/Runner.app/Info.plist || true
+          
+          # Thêm entitlements cho TrollStore
           ENTITLEMENTS_PATH="Runner/Runner.entitlements"
-          /usr/libexec/PlistBuddy -c "Add :get-task-allow bool true" "$ENTITLEMENTS_PATH" 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups array" "$ENTITLEMENTS_PATH" 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :com.apple.developer.team-identifier string XXXXXXXXXX" "$ENTITLEMENTS_PATH" 2>/dev/null || true
-      - name: Flutter build ipa
+          echo '<?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>get-task-allow</key>
+              <true/>
+              <key>com.apple.security.application-groups</key>
+              <array/>
+          </dict>
+          </plist>' > "$ENTITLEMENTS_PATH"
+      - name: Build unsigned IPA
         script: |
-          flutter build ipa --debug
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -allowProvisioningUpdates \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_BITCODE=NO
+          
+          # Create IPA
+          cd build/Release-iphoneos
+          mkdir Payload
+          cp -r Runner.app Payload/
+          zip -r app.ipa Payload
+          mv app.ipa ../../../build/ios/ipa/
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
-      - flutter_drive.log
     publishing:
       email:
         recipients:
