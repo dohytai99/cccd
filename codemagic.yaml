@@ -115,11 +115,6 @@ workflows:
           PLIST_BUDDY="/usr/libexec/PlistBuddy"
           $PLIST_BUDDY -c "Set :CFBundleIdentifier $BUNDLE_ID" "$PLIST_PATH"
           
-          # Tắt code signing
-          mkdir -p build/Release-iphoneos/Runner.app
-          /usr/libexec/PlistBuddy -c "Add :CODE_SIGNING_ALLOWED NO" build/Release-iphoneos/Runner.app/Info.plist || true
-          /usr/libexec/PlistBuddy -c "Add :CODE_SIGNING_REQUIRED NO" build/Release-iphoneos/Runner.app/Info.plist || true
-          
           # Thêm entitlements cho TrollStore
           ENTITLEMENTS_PATH="Runner/Runner.entitlements"
           echo '<?xml version="1.0" encoding="UTF-8"?>
@@ -134,38 +129,40 @@ workflows:
               <string>com.dohytai99.cccd</string>
           </dict>
           </plist>' > "$ENTITLEMENTS_PATH"
-      - name: Build unsigned IPA
+      - name: Build and prepare IPA for TrollStore
         script: |
-          cd $CM_BUILD_DIR/cccd/ios
+          cd $CM_BUILD_DIR/cccd
           
-          # Build app
-          xcodebuild -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphoneos \
-            -allowProvisioningUpdates \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            ENABLE_BITCODE=NO
+          # Build IPA
+          flutter build ipa --no-codesign
           
-          # Create IPA structure
-          cd build/Release-iphoneos
-          mkdir -p Payload/Runner.app
+          # Extract the IPA
+          cd build/ios/ipa
+          mv *.ipa original.ipa
+          unzip original.ipa -d extracted
           
-          # Copy all necessary files
-          cp -r Runner.app/* Payload/Runner.app/
+          # Modify Info.plist
+          cd extracted/Payload/*.app
+          PLIST_BUDDY="/usr/libexec/PlistBuddy"
+          $PLIST_BUDDY -c "Delete :CFBundleIdentifier" Info.plist || true
+          $PLIST_BUDDY -c "Add :CFBundleIdentifier string com.dohytai99.cccd" Info.plist
+          $PLIST_BUDDY -c "Delete :CFBundleExecutable" Info.plist || true
+          $PLIST_BUDDY -c "Add :CFBundleExecutable string Runner" Info.plist
+          $PLIST_BUDDY -c "Delete :CFBundleName" Info.plist || true
+          $PLIST_BUDDY -c "Add :CFBundleName string CCCD Scanner" Info.plist
           
-          # Ensure Info.plist is in the correct location
-          cp Runner.app/Info.plist Payload/Runner.app/Info.plist
+          # Create new IPA
+          cd ../..
+          zip -r ../trollstore.ipa Payload
+          cd ..
+          mv trollstore.ipa $CM_BUILD_DIR/build/ios/ipa/
           
-          # Create IPA
-          zip -r app.ipa Payload
-          mkdir -p $CM_BUILD_DIR/build/ios/ipa
-          mv app.ipa $CM_BUILD_DIR/build/ios/ipa/
+          # Clean up
+          rm -rf extracted
+          rm original.ipa
           
           # Verify IPA structure
-          unzip -l $CM_BUILD_DIR/build/ios/ipa/app.ipa | grep Info.plist
+          unzip -l trollstore.ipa | grep Info.plist
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
