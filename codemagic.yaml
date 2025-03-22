@@ -130,11 +130,15 @@ workflows:
               <true/>
               <key>com.apple.security.application-groups</key>
               <array/>
+              <key>application-identifier</key>
+              <string>com.dohytai99.cccd</string>
           </dict>
           </plist>' > "$ENTITLEMENTS_PATH"
       - name: Build unsigned IPA
         script: |
           cd $CM_BUILD_DIR/cccd/ios
+          
+          # Build app
           xcodebuild -workspace Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
@@ -145,13 +149,23 @@ workflows:
             CODE_SIGNING_ALLOWED=NO \
             ENABLE_BITCODE=NO
           
-          # Create IPA
+          # Create IPA structure
           cd build/Release-iphoneos
-          mkdir -p Payload
-          cp -r Runner.app Payload/
+          mkdir -p Payload/Runner.app
+          
+          # Copy all necessary files
+          cp -r Runner.app/* Payload/Runner.app/
+          
+          # Ensure Info.plist is in the correct location
+          cp Runner.app/Info.plist Payload/Runner.app/Info.plist
+          
+          # Create IPA
           zip -r app.ipa Payload
           mkdir -p $CM_BUILD_DIR/build/ios/ipa
           mv app.ipa $CM_BUILD_DIR/build/ios/ipa/
+          
+          # Verify IPA structure
+          unzip -l $CM_BUILD_DIR/build/ios/ipa/app.ipa | grep Info.plist
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
