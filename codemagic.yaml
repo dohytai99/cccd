@@ -5,7 +5,7 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       ios_signing:
-        distribution_type: app_store
+        distribution_type: development
         bundle_identifier: com.dohytai99.cccd
       vars:
         XCODE_WORKSPACE: "Runner.xcworkspace"
@@ -23,16 +23,20 @@ workflows:
       - name: Install pods
         script: |
           cd ios && pod install
-      - name: Update bundle ID
+      - name: Update bundle ID and entitlements
         script: |
           cd ios
           PLIST_PATH="Runner/Info.plist"
           PLIST_BUDDY="/usr/libexec/PlistBuddy"
           $PLIST_BUDDY -c "Set :CFBundleIdentifier $BUNDLE_ID" "$PLIST_PATH"
+          
+          ENTITLEMENTS_PATH="Runner/Runner.entitlements"
+          /usr/libexec/PlistBuddy -c "Add :get-task-allow bool true" "$ENTITLEMENTS_PATH" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.application-groups array" "$ENTITLEMENTS_PATH" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :com.apple.developer.team-identifier string XXXXXXXXXX" "$ENTITLEMENTS_PATH" 2>/dev/null || true
       - name: Flutter build ipa
         script: |
-          flutter build ipa --release \
-            --export-options-plist=/Users/builder/export_options.plist
+          flutter build ipa --debug
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
